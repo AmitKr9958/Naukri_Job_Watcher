@@ -25,16 +25,6 @@ class NaukriBrowser:
             except Exception:
                 pass
 
-        def on_new_page(new_page):
-            if new_page in self.allowed_pages:
-                return
-            async def close_unexpected():
-                try:
-                    await new_page.close()
-                except Exception:
-                    pass
-            asyncio.create_task(close_unexpected())
-        self.browser.on("page", on_new_page)
         return self.page
 
     async def new_worker_page(self):
