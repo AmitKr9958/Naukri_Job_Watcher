@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+data/*.db
+logs/*
+browser_profile/*
+*.log
+.pytest_cache/
+.vscode/
