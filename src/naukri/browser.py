@@ -13,6 +13,10 @@ class NaukriBrowser:
             str(PROFILE),
             headless=headless,
             viewport={'width':1440,'height':1000},
+            # Naukri is returning an empty SRP in headless Chromium. Keep the
+            # browser headful for normal site rendering, but start it minimized
+            # and off-screen so the watcher does not flood the desktop with tabs.
+            args=['--start-minimized','--window-position=-32000,-32000'],
             # Use standard Playwright Chromium settings; do not attempt to evade site security.
         )
         pages=self.browser.pages
