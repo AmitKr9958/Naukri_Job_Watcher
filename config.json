@@ -10,6 +10,8 @@
     "Remote"
   ],
   "posted_within_hours": 24,
+  "minimum_experience_years": 8,
+  "maximum_experience_years": 10,
   "check_interval_minutes": 10,
   "minimum_match_score": 40,
   "max_pages_per_search": 10,
