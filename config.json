@@ -10,6 +10,7 @@
     "Remote"
   ],
   "posted_within_hours": 24,
+  "freshness_days": 1,
   "minimum_experience_years": 8,
   "maximum_experience_years": 10,
   "check_interval_minutes": 10,
