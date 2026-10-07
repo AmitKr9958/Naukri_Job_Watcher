@@ -1,16 +1,19 @@
 async def enrich(page,job):
-    if not job.get('url'): return job
-    p=None
+    """Open the supplied page and replace the search-card text with the full JD."""
+    if not job.get('url'):
+        return job
     try:
-        p=await page.context.new_page()
-        await p.goto(job['url'],wait_until='domcontentloaded',timeout=60000)
-        await p.wait_for_timeout(800)
-        job['description']=(await p.locator('body').inner_text())[:30000]
+        await page.goto(job['url'],wait_until='domcontentloaded',timeout=60000)
+        await page.wait_for_timeout(500)
+        body=page.locator('body')
+        text=(await body.inner_text()).strip()
+        if text:
+            job['description']=text[:40000]
+
         if not job.get('company'):
-            el=p.locator('a.employer-name').first
-            if await el.count(): job['company']=(await el.inner_text()).strip()
+            el=page.locator('a.employer-name').first
+            if await el.count():
+                job['company']=(await el.inner_text()).strip()
     except Exception:
-        pass
-    finally:
-        if p: await p.close()
+        raise
     return job
