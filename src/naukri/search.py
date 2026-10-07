@@ -6,9 +6,9 @@ BASE='https://www.naukri.com'
 def build_search_url(keyword, location, minimum_experience=8, maximum_experience=10, freshness_days=1, sort='date'):
     path_keyword=quote_plus(keyword).replace('+','-')
     path_location=quote_plus(location).replace('+','-')
+    # Naukri already gets keyword/location from the path.
+    # Keeping k/l in the query can trigger an error page on some routes.
     params=urlencode({
-        'k': keyword,
-        'l': location,
         'experience': f'{minimum_experience}-{maximum_experience}',
         'jobAge': str(freshness_days),
         'sort': sort
@@ -25,7 +25,17 @@ async def search(page, keyword, location, max_pages=10, use_ui_filters=True,
 
     # Use Naukri's own search URL/filter state. This is more stable than
     # manipulating the React filter slider with guessed DOM selectors.
-    await page.goto(url, wait_until='domcontentloaded', timeout=60000)
+    try:
+        await page.goto(url, wait_until='domcontentloaded', timeout=60000)
+    except Exception:
+        # Naukri can reject sort=date while initializing the result page.
+        # Retry with the two core filters instead of abandoning the search.
+        fallback=url.split('?')[0]+'?'+urlencode({
+            'experience': f'{minimum_experience}-{maximum_experience}',
+            'jobAge': str(freshness_days)
+        })
+        print('FILTERED SEARCH RETRY '+fallback)
+        await page.goto(fallback, wait_until='domcontentloaded', timeout=60000)
     await page.wait_for_timeout(1500)
 
     print(
@@ -34,11 +44,15 @@ async def search(page, keyword, location, max_pages=10, use_ui_filters=True,
         ' | freshness='+str(freshness_days)+'day | sort=date'
     )
     current_url=page.url
-    required_filters=('experience='+str(minimum_experience)+'-'+str(maximum_experience), 'jobAge='+str(freshness_days), 'sort=date')
+    required_filters=(
+        'experience='+str(minimum_experience)+'-'+str(maximum_experience),
+        'jobAge='+str(freshness_days)
+    )
     missing=[x for x in required_filters if x not in current_url]
     if missing:
         raise RuntimeError('Naukri did not retain required filters: '+', '.join(missing))
-    print('FILTER VERIFICATION OK | experience='+str(minimum_experience)+'-'+str(maximum_experience)+' | freshness='+str(freshness_days)+'day | sort=date')
+    sort_present='sort=date' in current_url
+    print('FILTER VERIFICATION OK | experience='+str(minimum_experience)+'-'+str(maximum_experience)+' | freshness='+str(freshness_days)+'day | sort=date requested; url_sort='+str(sort_present))
     print('SEARCH URL '+current_url)
 
     seen_on_search=set()
