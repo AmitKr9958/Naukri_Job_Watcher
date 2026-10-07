@@ -26,6 +26,20 @@ class NaukriBrowser:
             except Exception:
                 pass
 
+        # Safety net: if Naukri or the site opens a new tab/window, close it
+        # immediately. The watcher is intentionally a one-tab application.
+        def _close_unexpected_page(new_page):
+            if new_page is self.page:
+                return
+            async def close_it():
+                try:
+                    await new_page.close()
+                except Exception:
+                    pass
+            asyncio.create_task(close_it())
+
+        self.browser.on("page", _close_unexpected_page)
+
         return self.page
 
     async def _login_visible(self):
