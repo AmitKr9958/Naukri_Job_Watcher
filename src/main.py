@@ -29,6 +29,10 @@ async def cycle():
     for _ in range(tab_count-1):
         worker_pages.append(await browser.new_worker_page())
 
+    # Persistent Chrome profiles can retain tabs from an interrupted run.
+    # Keep exactly the fixed worker tabs for this watcher.
+    await browser.close_extra_pages(worker_pages)
+
     search_page_pool=asyncio.Queue()
     for p in worker_pages:
         await search_page_pool.put(p)
@@ -53,6 +57,9 @@ async def cycle():
         except Exception:
                 logging.exception('Search failed: %s | %s',keyword,location)
         finally:
+            # Naukri may occasionally open a new tab from a UI action.
+            # Close it immediately; never let tabs accumulate between searches.
+            await browser.close_extra_pages(worker_pages)
             await search_page_pool.put(page)
 
     async def process_worker(worker_id,queue,db,page):
