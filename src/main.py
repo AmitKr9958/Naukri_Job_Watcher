@@ -26,16 +26,20 @@ async def cycle():
 
     async def run_search(keyword,location):
         async with search_sem:
-            page=await browser.browser.new_page()
+            page=browser.page
             try:
                 logging.info('SEARCH %s | %s',keyword,location)
-                jobs=await search(page,keyword,location,cfg['max_pages_per_search'])
+                jobs=await search(
+                    page,
+                    keyword,
+                    location,
+                    cfg['max_pages_per_search'],
+                    cfg.get('use_ui_search',True)
+                )
                 for job in jobs:
                     jobs_by_key[job['job_key']]=job
             except Exception:
                 logging.exception('Search failed: %s | %s',keyword,location)
-            finally:
-                await page.close()
 
     async def process_worker(worker_id,queue,db):
         page=await browser.browser.new_page()
