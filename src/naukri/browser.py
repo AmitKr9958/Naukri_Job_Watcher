@@ -4,6 +4,7 @@ from playwright.async_api import async_playwright
 
 ROOT=Path(__file__).resolve().parents[2]
 PROFILE=ROOT/'browser_profile'
+HOME='https://www.naukri.com'
 
 class NaukriBrowser:
     async def start(self,headless=True):
@@ -11,11 +12,14 @@ class NaukriBrowser:
         self.browser=await self.pw.chromium.launch_persistent_context(
             str(PROFILE),
             headless=headless,
-            viewport={'width':1440,'height':1000}
+            viewport={'width':1440,'height':1000},
+            args=['--disable-blink-features=AutomationControlled']
         )
         pages=self.browser.pages
         self.page=pages[0] if pages else await self.browser.new_page()
 
+        # Keep exactly one discovery/login tab. Do not close the browser/context
+        # while login is being completed manually.
         for extra in pages[1:]:
             try:
                 await extra.close()
@@ -24,48 +28,120 @@ class NaukriBrowser:
 
         return self.page
 
+    async def _login_visible(self):
+        page=self.page
+        candidates=[
+            'button:has-text("Login")',
+            'a:has-text("Login")',
+            'div:has-text("Login")'
+        ]
+        for selector in candidates:
+            try:
+                loc=page.locator(selector).first
+                if await loc.count() and await loc.is_visible():
+                    return True
+            except Exception:
+                pass
+        return False
+
+    async def _credential_form_visible(self):
+        page=self.page
+        selectors=[
+            'input[type="password"]',
+            'input[placeholder*="password" i]',
+            'input[placeholder*="email" i]',
+            'input[placeholder*="mobile" i]',
+            'input[placeholder*="OTP" i]',
+            'input[name*="otp" i]'
+        ]
+        for selector in selectors:
+            try:
+                loc=page.locator(selector).first
+                if await loc.count() and await loc.is_visible():
+                    return True
+            except Exception:
+                pass
+        return False
+
     async def ensure_login(self, timeout_seconds=300):
         page=self.page
-        await page.goto(
-            'https://www.naukri.com/nlogin/login',
-            wait_until='domcontentloaded',
-            timeout=60000
-        )
-        await page.wait_for_timeout(1500)
 
-        # If Naukri redirects an already-authenticated session away from login,
-        # no manual action is needed.
-        if '/nlogin/' not in page.url.lower():
-            print('Naukri session already authenticated.')
+        print('Opening Naukri for manual authentication...')
+        await page.goto(HOME, wait_until='domcontentloaded', timeout=60000)
+        await page.wait_for_timeout(2500)
+
+        # IMPORTANT: never infer authentication from the absence of a single
+        # text node. Naukri changes its header/modal DOM frequently.
+        if not await self._login_visible():
+            print('Naukri login button is not visible. Assuming existing session.')
             return True
 
-        print('Naukri login required. Complete login/OTP/CAPTCHA in the open browser window.')
+        print('')
+        print('==============================================')
+        print(' NAUKRI LOGIN REQUIRED')
+        print(' Complete login/OTP/CAPTCHA in this browser.')
+        print(' Do NOT close the Naukri browser window.')
+        print('==============================================')
+        print('')
+
+        # Open the login UI if possible, but tolerate Naukri changing the
+        # exact header element.
+        for selector in (
+            'button:has-text("Login")',
+            'a:has-text("Login")',
+            'div:has-text("Login")'
+        ):
+            try:
+                loc=page.locator(selector).first
+                if await loc.count() and await loc.is_visible():
+                    await loc.click(timeout=3000)
+                    break
+            except Exception:
+                pass
 
         deadline=asyncio.get_running_loop().time()+timeout_seconds
+
         while asyncio.get_running_loop().time()<deadline:
             await page.wait_for_timeout(2000)
 
+            # If the browser/context died, fail immediately instead of spawning
+            # hundreds of misleading TargetClosedError search failures.
+            if page.is_closed() or self.browser.is_closed():
+                raise RuntimeError(
+                    'Naukri browser closed during login. '
+                    'The watcher stopped before starting searches.'
+                )
+
             current=page.url.lower()
-            password=page.locator('input[type="password"], input[placeholder*="password" i]').first
-            otp=page.locator('input[placeholder*="OTP" i], input[name*="otp" i]').first
 
-            try:
-                password_visible=await password.is_visible()
-            except Exception:
-                password_visible=False
+            # Login forms can remain visible while OTP is being entered.
+            form_visible=await self._credential_form_visible()
+            login_visible=await self._login_visible()
 
-            try:
-                otp_visible=await otp.is_visible()
-            except Exception:
-                otp_visible=False
-
-            # Successful login normally redirects away from the nlogin route.
-            if '/nlogin/' not in current and not password_visible and not otp_visible:
-                print('Naukri login detected. Continuing.')
+            # Strong success signal: credential/OTP form gone AND the page has
+            # navigated away from an authentication route, with Login no longer
+            # presented as the main header action.
+            if not form_visible and not login_visible and '/nlogin/' not in current:
+                print('Naukri login confirmed.')
                 return True
 
-        raise TimeoutError('Naukri login was not completed within the allowed time.')
+            # A successful login can redirect to the home/search page while a
+            # stale modal disappears a little later.
+            if not form_visible and '/nlogin/' not in current:
+                await page.wait_for_timeout(1500)
+                if not await self._login_visible():
+                    print('Naukri login confirmed.')
+                    return True
+
+        raise TimeoutError(
+            'Naukri login was not completed within '
+            +str(timeout_seconds)+' seconds. '
+            'The watcher did not start searching.'
+        )
 
     async def close(self):
-        await self.browser.close()
-        await self.pw.stop()
+        try:
+            if not self.browser.is_closed():
+                await self.browser.close()
+        finally:
+            await self.pw.stop()
