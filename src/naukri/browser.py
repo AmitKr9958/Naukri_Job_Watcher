@@ -13,7 +13,7 @@ class NaukriBrowser:
             str(PROFILE),
             headless=headless,
             viewport={'width':1440,'height':1000},
-            args=['--disable-blink-features=AutomationControlled']
+            # Use standard Playwright Chromium settings; do not attempt to evade site security.
         )
         pages=self.browser.pages
         self.page=pages[0] if pages else await self.browser.new_page()
