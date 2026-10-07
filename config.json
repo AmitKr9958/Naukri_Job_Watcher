@@ -17,6 +17,7 @@
   "detail_concurrency": 6,
   "send_only_new_jobs": true,
   "auto_apply": false,
-  "headless": true,
+  "headless": false,
+  "use_ui_search": true,
   "use_browser_use_fallback": true
 }
