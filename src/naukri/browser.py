@@ -44,6 +44,28 @@ class NaukriBrowser:
             except Exception:
                 pass
 
+    def guard_pages(self, keep_pages):
+        """Immediately close any tab opened outside the fixed worker pool."""
+        keep=set(keep_pages)
+        self._guard_keep_pages=keep
+
+        async def close_if_unexpected(page):
+            await asyncio.sleep(0)
+            if page in self._guard_keep_pages:
+                return
+            try:
+                if not page.is_closed():
+                    await page.close()
+                    print('EXTRA TAB CLOSED | '+str(page.url))
+            except Exception:
+                pass
+
+        def on_page(page):
+            if page not in self._guard_keep_pages:
+                asyncio.create_task(close_if_unexpected(page))
+
+        self.browser.on('page', on_page)
+
     async def _login_visible(self):
         page=self.page
         candidates=[
