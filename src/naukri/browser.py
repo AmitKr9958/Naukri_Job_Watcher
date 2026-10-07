@@ -18,17 +18,29 @@ class NaukriBrowser:
         pages=self.browser.pages
         self.page=pages[0] if pages else await self.browser.new_page()
 
-        # Keep exactly one discovery/login tab. Do not close the browser/context
-        # while login is being completed manually.
+        self.allowed_pages=set([self.page])
         for extra in pages[1:]:
             try:
                 await extra.close()
             except Exception:
                 pass
 
-
-
+        def on_new_page(new_page):
+            if new_page in self.allowed_pages:
+                return
+            async def close_unexpected():
+                try:
+                    await new_page.close()
+                except Exception:
+                    pass
+            asyncio.create_task(close_unexpected())
+        self.browser.on("page", on_new_page)
         return self.page
+
+    async def new_worker_page(self):
+        page=await self.browser.new_page()
+        self.allowed_pages.add(page)
+        return page
 
     async def _login_visible(self):
         page=self.page
