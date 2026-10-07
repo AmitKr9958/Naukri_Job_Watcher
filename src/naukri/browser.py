@@ -32,6 +32,18 @@ class NaukriBrowser:
         self.allowed_pages.add(page)
         return page
 
+    async def close_extra_pages(self, keep_pages):
+        """Keep only the fixed worker tabs; close unexpected/pop-up tabs."""
+        keep=set(keep_pages)
+        for page in list(self.browser.pages):
+            if page in keep:
+                continue
+            try:
+                if not page.is_closed():
+                    await page.close()
+            except Exception:
+                pass
+
     async def _login_visible(self):
         page=self.page
         candidates=[
