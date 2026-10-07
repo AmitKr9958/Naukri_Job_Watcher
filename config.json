@@ -1,16 +1,11 @@
 {
-  "locations": [
-    "Delhi",
-    "Gurgaon",
-    "Gurugram",
-    "Noida",
-    "Jaipur"
-  ],
+  "locations": ["Delhi/NCR","Delhi","New Delhi","Gurgaon","Gurugram","Noida","Jaipur","Remote"],
   "posted_within_hours": 24,
   "check_interval_minutes": 10,
   "minimum_match_score": 40,
   "max_pages_per_search": 20,
   "send_only_new_jobs": true,
   "auto_apply": false,
-  "headless": true
+  "headless": true,
+  "use_browser_use_fallback": true
 }
