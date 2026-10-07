@@ -20,7 +20,7 @@
   "detail_concurrency": 5,
   "send_only_new_jobs": true,
   "auto_apply": false,
-  "headless": false,
+  "headless": true,
   "require_naukri_login": true,
   "login_wait_seconds": 300,
   "use_ui_search": true,
