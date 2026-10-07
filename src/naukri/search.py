@@ -62,13 +62,13 @@ async def _apply_ui_filters(page):
             pass
     return applied
 
-async def search(page,keyword,location,max_pages=20,use_ui_filters=True):
+async def search(page,keyword,location,max_pages=20,use_ui_filters=True,minimum_experience=8,maximum_experience=10):
     results=[]
     ui_ok=False
     try:
         ui_ok=await _open_search_ui(page,keyword,location)
         if ui_ok and use_ui_filters:
-            applied=await _apply_ui_filters(page)
+            applied=await _apply_ui_filters(page,minimum_experience,maximum_experience)
             logging_text='; '.join(applied) if applied else 'no UI filters detected'
             print('FILTERS '+keyword+' | '+location+' | '+logging_text)
     except Exception:
