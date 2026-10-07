@@ -38,7 +38,7 @@ async def cycle():
         page=await search_page_pool.get()
         try:
             logging.info('SEARCH %s | %s',keyword,location)
-                jobs=await search(
+            jobs=await search(
                     page,
                     keyword,
                     location,
@@ -47,10 +47,10 @@ async def cycle():
                     cfg.get('minimum_experience_years',8),
                     cfg.get('maximum_experience_years',10),
                     cfg.get('freshness_days',1)
-                )
-                for job in jobs:
-                    jobs_by_key[job['job_key']]=job
-            except Exception:
+            )
+            for job in jobs:
+                jobs_by_key[job['job_key']]=job
+        except Exception:
                 logging.exception('Search failed: %s | %s',keyword,location)
         finally:
             await search_page_pool.put(page)
