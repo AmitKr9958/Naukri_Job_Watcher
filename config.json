@@ -17,7 +17,7 @@
   "minimum_match_score": 40,
   "max_pages_per_search": 10,
   "search_concurrency": 1,
-  "detail_concurrency": 6,
+  "detail_concurrency": 1,
   "send_only_new_jobs": true,
   "auto_apply": false,
   "headless": false,
