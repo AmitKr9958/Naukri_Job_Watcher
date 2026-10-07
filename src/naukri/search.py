@@ -85,6 +85,70 @@ async def _open_search_page(page, keyword, location, minimum_experience, maximum
         '. Last error: '+str(last_error)
     )
 
+async def _click_text_variants(page, variants, timeout=2500):
+    for value in variants:
+        selectors=[
+            'button:has-text("'+value+'")',
+            'a:has-text("'+value+'")',
+            'div:has-text("'+value+'")',
+            'span:has-text("'+value+'")'
+        ]
+        for selector in selectors:
+            try:
+                loc=page.locator(selector).first
+                if await loc.count() and await loc.is_visible():
+                    await loc.click(timeout=timeout)
+                    return True
+            except Exception:
+                pass
+    return False
+
+async def _apply_ui_filters(page, freshness_days):
+    # The query-string form of jobAge can trigger an SRP error on some
+    # Naukri routes. Apply freshness and date sorting through the visible UI
+    # after the stable search page has loaded.
+    applied_freshness=False
+    applied_sort=False
+
+    try:
+        opened=await _click_text_variants(
+            page, ['Freshness', 'freshness'], timeout=2000
+        )
+        if opened:
+            day_label='1 Day' if int(freshness_days)==1 else str(freshness_days)+' Days'
+            applied_freshness=await _click_text_variants(
+                page,
+                [day_label, day_label.lower(), 'Last '+str(freshness_days)+' day',
+                 'Last '+str(freshness_days)+' days'],
+                timeout=2500
+            )
+            if applied_freshness:
+                await page.wait_for_timeout(1200)
+    except Exception:
+        pass
+
+    try:
+        opened=await _click_text_variants(
+            page,
+            ['Sort by: Relevance', 'Sort By: Relevance', 'Relevance'],
+            timeout=2000
+        )
+        if opened:
+            applied_sort=await _click_text_variants(
+                page, ['Date', 'date', 'Newest', 'Newest first'],
+                timeout=2500
+            )
+            if applied_sort:
+                await page.wait_for_timeout(1200)
+    except Exception:
+        pass
+
+    print(
+        'UI FILTER RESULT | freshness='+str(applied_freshness)+
+        ' | sort_date='+str(applied_sort)
+    )
+    return applied_freshness, applied_sort
+
 async def search(page, keyword, location, max_pages=10, use_ui_filters=True,
                  minimum_experience=8, maximum_experience=10, freshness_days=1):
     results=[]
@@ -104,6 +168,15 @@ async def search(page, keyword, location, max_pages=10, use_ui_filters=True,
         ' | fallback_attempt='+str(state['attempt'])
     )
     print('SEARCH URL '+state['url'])
+
+    ui_freshness=False
+    ui_sort=False
+    if use_ui_filters:
+        ui_freshness, ui_sort=await _apply_ui_filters(page, freshness_days)
+    if not ui_freshness:
+        print('FRESHNESS UI FILTER NOT CONFIRMED; final is_recent() check remains mandatory.')
+    if not ui_sort:
+        print('DATE SORT UI FILTER NOT CONFIRMED; continuing with available result order.')
 
     seen_on_search=set()
     last_signature=None
@@ -159,6 +232,8 @@ async def search(page, keyword, location, max_pages=10, use_ui_filters=True,
                     'filter_sort':'date',
                     'server_experience_filter':state['server_experience_filter'],
                     'server_freshness_filter':state['server_freshness_filter'],
+                    'ui_freshness_filter':ui_freshness,
+                    'ui_sort_date':ui_sort,
                     'search_url':page.url
                 })
             except Exception:
