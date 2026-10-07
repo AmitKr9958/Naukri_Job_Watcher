@@ -21,6 +21,8 @@ async def cycle():
 
     browser=NaukriBrowser()
     await browser.start(cfg.get('headless',True))
+    if cfg.get('require_naukri_login',True):
+        await browser.ensure_login(cfg.get('login_wait_seconds',300))
     search_sem=asyncio.Semaphore(search_workers)
     jobs_by_key={}
 
