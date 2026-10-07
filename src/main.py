@@ -36,7 +36,10 @@ async def cycle():
                     keyword,
                     location,
                     cfg['max_pages_per_search'],
-                    cfg.get('use_ui_search',True)
+                    cfg.get('use_ui_search',True),
+                    cfg.get('minimum_experience_years',8),
+                    cfg.get('maximum_experience_years',10),
+                    cfg.get('freshness_days',1)
                 )
                 for job in jobs:
                     jobs_by_key[job['job_key']]=job
