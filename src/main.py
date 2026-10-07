@@ -16,21 +16,28 @@ logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)s %(messa
 async def cycle():
     cfg=json.loads((ROOT/'config.json').read_text(encoding='utf-8'))
     keys=json.loads((ROOT/'config/keywords.json').read_text(encoding='utf-8'))['keywords']
-    search_workers=int(cfg.get('search_concurrency',8))
-    detail_workers=int(cfg.get('detail_concurrency',6))
+    search_workers=int(cfg.get('search_concurrency',5))
+    detail_workers=int(cfg.get('detail_concurrency',5))
+    tab_count=max(1,min(5,search_workers,detail_workers))
 
     browser=NaukriBrowser()
     await browser.start(cfg.get('headless',True))
     if cfg.get('require_naukri_login',True):
         await browser.ensure_login(cfg.get('login_wait_seconds',300))
-    search_sem=asyncio.Semaphore(search_workers)
+
+    worker_pages=[browser.page]
+    for _ in range(tab_count-1):
+        worker_pages.append(await browser.new_worker_page())
+
+    search_page_pool=asyncio.Queue()
+    for p in worker_pages:
+        await search_page_pool.put(p)
     jobs_by_key={}
 
     async def run_search(keyword,location):
-        async with search_sem:
-            page=browser.page
-            try:
-                logging.info('SEARCH %s | %s',keyword,location)
+        page=await search_page_pool.get()
+        try:
+            logging.info('SEARCH %s | %s',keyword,location)
                 jobs=await search(
                     page,
                     keyword,
@@ -45,11 +52,10 @@ async def cycle():
                     jobs_by_key[job['job_key']]=job
             except Exception:
                 logging.exception('Search failed: %s | %s',keyword,location)
+        finally:
+            await search_page_pool.put(page)
 
-    async def process_worker(worker_id,queue,db):
-        # Use one dedicated tab per JD worker. The configured detail_concurrency
-        # controls the maximum number of JD tabs.
-        page=await browser.browser.new_page()
+    async def process_worker(worker_id,queue,db,page):
         try:
             while True:
                 job=await queue.get()
@@ -109,7 +115,7 @@ async def cycle():
                 finally:
                     queue.task_done()
         finally:
-            await page.close()
+            pass
 
     try:
         # Phase 1: broad search only. Do not discard candidates on card text.
@@ -124,8 +130,8 @@ async def cycle():
             await queue.put(job)
 
         workers=[
-            asyncio.create_task(process_worker(i+1,queue,db))
-            for i in range(detail_workers)
+            asyncio.create_task(process_worker(i+1,queue,db,worker_pages[i]))
+            for i in range(min(detail_workers,tab_count))
         ]
         await queue.join()
 
