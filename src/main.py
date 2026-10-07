@@ -47,9 +47,9 @@ async def cycle():
                 logging.exception('Search failed: %s | %s',keyword,location)
 
     async def process_worker(worker_id,queue,db):
-        # Reuse the single discovery/JD tab. Creating separate pages can leave
-        # many visible Naukri tabs open.
-        page=browser.page
+        # Use one dedicated tab per JD worker. The configured detail_concurrency
+        # controls the maximum number of JD tabs.
+        page=await browser.browser.new_page()
         try:
             while True:
                 job=await queue.get()
@@ -109,8 +109,7 @@ async def cycle():
                 finally:
                     queue.task_done()
         finally:
-            # The shared browser.page belongs to NaukriBrowser.
-            pass
+            await page.close()
 
     try:
         # Phase 1: broad search only. Do not discard candidates on card text.
