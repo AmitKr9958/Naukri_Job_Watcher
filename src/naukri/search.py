@@ -33,7 +33,13 @@ async def search(page, keyword, location, max_pages=10, use_ui_filters=True,
         ' | experience='+str(minimum_experience)+'-'+str(maximum_experience)+
         ' | freshness='+str(freshness_days)+'day | sort=date'
     )
-    print('SEARCH URL '+page.url)
+    current_url=page.url
+    required_filters=('experience='+str(minimum_experience)+'-'+str(maximum_experience), 'jobAge='+str(freshness_days), 'sort=date')
+    missing=[x for x in required_filters if x not in current_url]
+    if missing:
+        raise RuntimeError('Naukri did not retain required filters: '+', '.join(missing))
+    print('FILTER VERIFICATION OK | experience='+str(minimum_experience)+'-'+str(maximum_experience)+' | freshness='+str(freshness_days)+'day | sort=date')
+    print('SEARCH URL '+current_url)
 
     seen_on_search=set()
     last_signature=None
