@@ -32,6 +32,9 @@ async def cycle():
     # Persistent Chrome profiles can retain tabs from an interrupted run.
     # Keep exactly the fixed worker tabs for this watcher.
     await browser.close_extra_pages(worker_pages)
+    # Install the guard only after all 5 worker pages exist, so there is no
+    # race between page creation and registration.
+    browser.guard_pages(worker_pages)
 
     search_page_pool=asyncio.Queue()
     for p in worker_pages:
